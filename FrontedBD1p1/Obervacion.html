@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Observaciones de Biodiversidad</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    .observation-card {
+      margin-bottom: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .observation-img {
+      height: 180px;
+      object-fit: cover;
+      cursor: pointer;
+    }
+    .admin-button {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      z-index: 1000;
+      padding: 12px 20px;
+      font-size: 1.1rem;
+    }
+    .inform-button {
+      position: fixed;
+      bottom: 30px;
+      left: 30px;
+      z-index: 1000;
+      padding: 12px 20px;
+      font-size: 1.1rem;
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <div class="container py-4">
+    <h1 class="mb-4 text-center">Observaciones de Biodiversidad</h1>
+
+    <div id="observations-container" class="row">
+      <div class="col-12 text-center">
+        <div class="spinner-border text-success" role="status">
+          <span class="visually-hidden">Cargando...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Botón flotante para CRUD -->
+  <a href="observacionesCRUD.html" class="btn btn-success admin-button rounded-pill shadow">
+    <i class="bi bi-gear-fill me-2"></i>Gestión
+  </a>
+  
+  <!-- Botón flotante para Informes - Versión simplificada -->
+  <a href="Informes.html" class="btn btn-primary inform-button rounded-pill shadow">
+    <i class="bi bi-graph-up me-2"></i>Informes
+  </a>
+
+  <!-- Modal para detalles -->
+  <div class="modal fade" id="observationModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header bg-success text-white">
+          <h5 class="modal-title">Detalles de Observación</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="modalBody">
+          Cargando detalles...
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para identificaciones -->
+  <div class="modal fade" id="identificationsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header bg-info text-white">
+          <h5 class="modal-title">Identificaciones</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="currentTaxonInfo" class="mb-3 p-3 bg-light rounded"></div>
+          <div id="identificationsList">
+            Cargando identificaciones...
+          </div>
+          <hr>
+          <h5>Agregar Opinión</h5>
+          <form id="identificationForm">
+            <input type="hidden" id="identificationId">
+            <input type="hidden" id="observationId">
+            
+            <div class="mb-3">
+              <label for="userId" class="form-label">Identificador</label>
+              <select class="form-select" id="userId" required>
+                <option value="">Cargando usuarios...</option>
+              </select>
+            </div>
+            
+            <div class="mb-3">
+              <label for="confidenceLevel" class="form-label">Nivel de Confianza (1-5)</label>
+              <select class="form-select" id="confidenceLevel" required>
+                <option value="1">★☆☆☆☆ (Bajo)</option>
+                <option value="2">★★☆☆☆</option>
+                <option value="3" selected>★★★☆☆ (Medio)</option>
+                <option value="4">★★★★☆</option>
+                <option value="5">★★★★★ (Alto)</option>
+              </select>
+            </div>
+            
+            <div class="mb-3">
+              <label for="identificationComment" class="form-label">Comentario</label>
+              <textarea class="form-control" id="identificationComment" rows="3"></textarea>
+            </div>
+            
+            <div class="d-flex justify-content-end">
+              <button type="button" class="btn btn-secondary me-2" onclick="resetIdentificationForm()">Cancelar</button>
+              <button type="submit" class="btn btn-primary">Guardar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para imagen -->
+  <div class="modal fade" id="imageInfoModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title">Información de la Imagen</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="imageInfoBody">
+          Cargando información...
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // Variables globales
+    let observationModal, identificationsModal, imageInfoModal;
+    let currentObservationId, currentTaxon, usuarios = [];
+
+    // Inicialización
+    document.addEventListener('DOMContentLoaded', function() {
+      observationModal = new bootstrap.Modal('#observationModal');
+      identificationsModal = new bootstrap.Modal('#identificationsModal');
+      imageInfoModal = new bootstrap.Modal('#imageInfoModal');
+      
+      document.getElementById('identificationForm').addEventListener('submit', handleIdentificationSubmit);
+      loadUsuarios();
+      loadObservations();
+    });
+
+    // Función para formatear fecha
+    function formatDate(dateString) {
+      if (!dateString) return 'No especificada';
+      return new Date(dateString).toLocaleString('es-ES');
+    }
+
+    // Cargar usuarios
+    function loadUsuarios() {
+      fetch("http://localhost:8080/api/usuarios")
+        .then(response => response.json())
+        .then(data => {
+          usuarios = data;
+          const select = document.getElementById('userId');
+          select.innerHTML = '<option value="">Seleccione un usuario</option>';
+          data.forEach(u => {
+            select.innerHTML += `<option value="${u.id}">${u.nombre} ${u.apellido1}</option>`;
+          });
+        })
+        .catch(error => console.error('Error al cargar usuarios:', error));
+    }
+
+    // Cargar observaciones
+    function loadObservations() {
+      fetch("http://localhost:8080/api/observaciones")
+        .then(response => response.json())
+        .then(data => {
+          const container = document.getElementById('observations-container');
+          container.innerHTML = '';
+          
+          data.forEach(obs => {
+            container.innerHTML += `
+              <div class="col-md-6 col-lg-4 mb-3">
+                <div class="card observation-card h-100">
+                  <img src="${obs.urlImagen}" class="card-img-top observation-img" 
+                       alt="${obs.taxon?.nombreComun || 'Observación'}"
+                       onerror="this.src='https://via.placeholder.com/400x200?text=Imagen+no+disponible'"
+                       onclick="showImageInfo(${obs.id})">
+                  
+                  <div class="card-body">
+                    <h3 class="h5">${obs.taxon?.nombreComun || 'Especie no identificada'}</h3>
+                    <p><em>${obs.taxon?.nombreCientifico || ''}</em></p>
+                    
+                    <p><i class="bi bi-calendar"></i> ${formatDate(obs.fechaObservacion)}</p>
+                    <p><i class="bi bi-person"></i> ${obs.usuario?.nombre || ''} ${obs.usuario?.apellido1 || ''}</p>
+                    
+                    <div class="d-flex justify-content-between mt-3">
+                      <button class="btn btn-sm btn-outline-success" onclick="showDetails(${obs.id})">
+                        <i class="bi bi-eye"></i> Detalles
+                      </button>
+                      <button class="btn btn-sm btn-outline-info" onclick="showIdentifications(${obs.id})">
+                        <i class="bi bi-tags"></i> Identificaciones
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            `;
+          });
+        })
+        .catch(error => {
+          document.getElementById('observations-container').innerHTML = `
+            <div class="alert alert-danger">
+              Error al cargar observaciones: ${error.message}
+            </div>
+          `;
+        });
+    }
+
+    // Mostrar detalles
+    function showDetails(id) {
+      const modalBody = document.getElementById('modalBody');
+      modalBody.innerHTML = '<div class="text-center p-4"><div class="spinner-border"></div></div>';
+      
+      fetch(`http://localhost:8080/api/observaciones/${id}`)
+        .then(response => response.json())
+        .then(obs => {
+          modalBody.innerHTML = `
+            <div class="row">
+              <div class="col-md-6">
+                <img src="${obs.urlImagen}" class="img-fluid rounded mb-3" 
+                     onerror="this.src='https://via.placeholder.com/800x400?text=Imagen+no+disponible'">
+              </div>
+              <div class="col-md-6">
+                <h4>${obs.taxon?.nombreComun || 'Especie no identificada'}</h4>
+                <p><em>${obs.taxon?.nombreCientifico || ''}</em></p>
+                <p><strong>Fecha:</strong> ${formatDate(obs.fechaObservacion)}</p>
+                <p><strong>Observador:</strong> ${obs.usuario?.nombre || ''} ${obs.usuario?.apellido1 || ''}</p>
+                <p><strong>Coordenadas:</strong> ${obs.latitud}, ${obs.longitud}</p>
+                <p><strong>Notas:</strong> ${obs.notas || 'No hay notas'}</p>
+              </div>
+            </div>
+          `;
+          observationModal.show();
+        })
+        .catch(error => {
+          modalBody.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
+          observationModal.show();
+        });
+    }
+
+    // Mostrar identificaciones
+    function showIdentifications(id) {
+      currentObservationId = id;
+      
+      fetch(`http://localhost:8080/api/observaciones/${id}`)
+        .then(response => response.json())
+        .then(obs => {
+          currentTaxon = obs.taxon;
+          document.getElementById('currentTaxonInfo').innerHTML = `
+            <h5>Identificaciones para:</h5>
+            <h4>${currentTaxon?.nombreComun || 'Especie no identificada'}</h4>
+            <p><em>${currentTaxon?.nombreCientifico || ''}</em></p>
+          `;
+          
+          fetchIdentifications(id);
+          document.getElementById('observationId').value = id;
+          identificationsModal.show();
+        });
+    }
+
+    // Cargar identificaciones
+    function fetchIdentifications(id) {
+      const list = document.getElementById('identificationsList');
+      list.innerHTML = '<div class="text-center p-4"><div class="spinner-border"></div></div>';
+      
+      fetch(`http://localhost:8080/api/identificaciones/por-observacion/${id}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.length === 0) {
+            list.innerHTML = '<div class="alert alert-info">No hay identificaciones</div>';
+          } else {
+            let html = '<div class="list-group">';
+            data.forEach(ident => {
+              const stars = '★'.repeat(ident.confianza) + '☆'.repeat(5 - ident.confianza);
+              html += `
+                <div class="list-group-item">
+                  <div class="d-flex justify-content-between">
+                    <div>
+                      <strong>${ident.usuario?.nombre || ''} ${ident.usuario?.apellido1 || ''}</strong>
+                      <div>${stars} (${formatDate(ident.fecha)})</div>
+                      <div>${ident.comentario || '-'}</div>
+                    </div>
+                    <div>
+                      <button class="btn btn-sm btn-outline-primary me-1" onclick="editIdentification(${ident.id})">
+                        <i class="bi bi-pencil"></i>
+                      </button>
+                      <button class="btn btn-sm btn-outline-danger" onclick="deleteIdentification(${ident.id})">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              `;
+            });
+            list.innerHTML = html + '</div>';
+          }
+        })
+        .catch(error => {
+          list.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
+        });
+    }
+
+    // Manejar formulario de identificación
+    function handleIdentificationSubmit(e) {
+      e.preventDefault();
+      
+      const id = document.getElementById('identificationId').value;
+      const url = id 
+        ? `http://localhost:8080/api/identificaciones/${id}` 
+        : `http://localhost:8080/api/identificaciones`;
+      
+      const data = {
+        observacion: { id: parseInt(document.getElementById('observationId').value) },
+        taxon: { id: currentTaxon?.id },
+        usuario: { id: parseInt(document.getElementById('userId').value) },
+        confianza: parseInt(document.getElementById('confidenceLevel').value),
+        comentario: document.getElementById('identificationComment').value
+      };
+      
+      if (id) data.id = parseInt(id);
+      
+      fetch(url, {
+        method: id ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      })
+      .then(response => response.json())
+      .then(() => {
+        fetchIdentifications(currentObservationId);
+        resetIdentificationForm();
+      })
+      .catch(error => alert('Error: ' + error.message));
+    }
+
+    // Resetear formulario
+    function resetIdentificationForm() {
+      document.getElementById('identificationForm').reset();
+      document.getElementById('identificationId').value = '';
+      document.getElementById('confidenceLevel').value = '3';
+    }
+
+    // Editar identificación
+    function editIdentification(id) {
+      fetch(`http://localhost:8080/api/identificaciones/${id}`)
+        .then(response => response.json())
+        .then(ident => {
+          document.getElementById('identificationId').value = ident.id;
+          document.getElementById('userId').value = ident.usuario?.id || '';
+          document.getElementById('confidenceLevel').value = ident.confianza || 3;
+          document.getElementById('identificationComment').value = ident.comentario || '';
+        })
+        .catch(error => alert('Error: ' + error.message));
+    }
+
+    // Eliminar identificación
+    function deleteIdentification(id) {
+      if (confirm('¿Eliminar esta identificación?')) {
+        fetch(`http://localhost:8080/api/identificaciones/${id}`, { method: 'DELETE' })
+          .then(() => fetchIdentifications(currentObservationId))
+          .catch(error => alert('Error: ' + error.message));
+      }
+    }
+
+    // Mostrar info de imagen
+    function showImageInfo(id) {
+      const modalBody = document.getElementById('imageInfoBody');
+      modalBody.innerHTML = '<div class="text-center p-4"><div class="spinner-border"></div></div>';
+      
+      fetch(`http://localhost:8080/api/imagenes/por-observacion/${id}`)
+        .then(response => response.json())
+        .then(img => {
+          modalBody.innerHTML = `
+            <img src="${img.observacion?.urlImagen || 'https://via.placeholder.com/800x400'}" class="img-fluid mb-3">
+            <p><strong>Propietario:</strong> ${img.propietarioImagen || 'Desconocido'}</p>
+            <p><strong>Licencia:</strong> ${img.licencia?.nombre || 'Desconocida'}</p>
+            <p><strong>Fecha:</strong> ${formatDate(img.fechaToma)}</p>
+          `;
+          imageInfoModal.show();
+        })
+        .catch(error => {
+          modalBody.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
+          imageInfoModal.show();
+        });
+    }
+  </script>
+</body>
+</html>

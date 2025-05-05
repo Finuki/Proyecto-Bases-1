@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>CRUD de Observaciones de Biodiversidad</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  <style>
+    .card-img-top {
+      height: 200px;
+      object-fit: cover;
+    }
+    .form-container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .taxon-select {
+      margin-bottom: 15px;
+    }
+    #observations-container {
+      min-height: 300px;
+    }
+    .img-thumbnail {
+      max-height: 100px;
+      cursor: pointer;
+    }
+    .image-metadata {
+      font-size: 0.85rem;
+      color: #6c757d;
+    }
+    .image-actions {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <div class="container py-4">
+    <h1 class="mb-4 text-center">Gestión de Observaciones</h1>
+    
+    <div class="text-end mb-4">
+      <button class="btn btn-success" onclick="showAddForm()">
+        <i class="bi bi-plus-circle"></i> Nueva Observación
+      </button>
+    </div>
+    
+    <div id="form-container" class="card mb-4 form-container" style="display: none;">
+      <div class="card-header bg-success text-white">
+        <h5 id="form-title" class="mb-0">Nueva Observación</h5>
+      </div>
+      <div class="card-body">
+        <form id="observation-form">
+          <input type="hidden" id="observation-id">
+          
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <label for="usuario-id" class="form-label">Usuario</label>
+              <select class="form-select" id="usuario-id" required>
+                <option value="">Seleccione un usuario</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label for="taxon-level" class="form-label">Nivel Taxonómico</label>
+              <select class="form-select" id="taxon-level">
+                <option value="clase">Clase</option>
+                <option value="orden">Orden</option>
+                <option value="familia">Familia</option>
+                <option value="genero">Género</option>
+                <option value="especie">Especie</option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="taxon-select">
+            <label id="taxon-label" class="form-label">Seleccione</label>
+            <select class="form-select" id="taxon-select" required>
+              <option value="">Seleccione primero un nivel</option>
+            </select>
+          </div>
+          
+          <div class="mb-3">
+            <label for="url-imagen" class="form-label">URL de la Imagen</label>
+            <input type="url" class="form-control" id="url-imagen" required>
+          </div>
+          
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <label for="fecha-observacion" class="form-label">Fecha de Observación</label>
+              <input type="date" class="form-control" id="fecha-observacion" required>
+            </div>
+          </div>
+          
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <label for="latitud" class="form-label">Latitud</label>
+              <input type="number" step="0.000001" class="form-control" id="latitud" required>
+            </div>
+            <div class="col-md-6">
+              <label for="longitud" class="form-label">Longitud</label>
+              <input type="number" step="0.000001" class="form-control" id="longitud" required>
+            </div>
+          </div>
+          
+          <div class="mb-3">
+            <label for="notas" class="form-label">Notas</label>
+            <textarea class="form-control" id="notas" rows="3"></textarea>
+          </div>
+          
+          <div class="text-end">
+            <button type="button" class="btn btn-secondary me-2" onclick="hideForm()">Cancelar</button>
+            <button type="submit" class="btn btn-success">Guardar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    
+    <div id="observations-container" class="row">
+      <div class="col-12 text-center py-5">
+        <div class="spinner-border text-success" role="status">
+          <span class="visually-hidden">Cargando...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para confirmar eliminación de observación -->
+  <div class="modal fade" id="confirmDeleteModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title">Confirmar Eliminación</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          ¿Estás seguro de que deseas eliminar esta observación?
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-danger" id="confirm-delete-btn">Eliminar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para gestión de imágenes -->
+  <div class="modal fade" id="imageModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title" id="imageModalTitle">Gestión de Imagen</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <form id="image-form">
+            <input type="hidden" id="image-id">
+            <input type="hidden" id="observation-id-for-image">
+            
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <img id="image-preview" src="" class="img-fluid rounded mb-2" alt="Vista previa de la imagen">
+              </div>
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="image-url" class="form-label">URL de la Imagen</label>
+                  <input type="url" class="form-control" id="image-url" required>
+                </div>
+                
+                <div class="mb-3">
+                  <label for="image-license" class="form-label">Licencia</label>
+                  <select class="form-select" id="image-license" required>
+                    <option value="">Seleccione una licencia</option>
+                    <option value="1">CC BY 4.0</option>
+                    <option value="2">CC BY-NC 4.0</option>
+                    <option value="3">CC BY-SA 4.0</option>
+                  </select>
+                </div>
+                
+                <div class="mb-3">
+                  <label for="image-owner" class="form-label">Propietario de la Imagen</label>
+                  <input type="text" class="form-control" id="image-owner" required>
+                </div>
+                
+                <div class="mb-3">
+                  <label for="image-date" class="form-label">Fecha de Toma</label>
+                  <input type="date" class="form-control" id="image-date" required>
+                </div>
+              </div>
+            </div>
+          </form>
+          
+          <div id="image-metadata" class="image-metadata mt-3">
+            <!-- Aquí se mostrarán los metadatos de la imagen -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-danger" id="delete-image-btn" style="display: none;">Eliminar Imagen</button>
+          <button type="button" class="btn btn-primary" id="save-image-btn">Guardar Imagen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    // Variables globales
+    const API_BASE_URL = 'http://localhost:8080';
+    let usuarios = [];
+    let taxones = [];
+    let taxonesPorNivel = {};
+    let deleteModal = null;
+    let imageModal = null;
+    let observationToDelete = null;
+    let currentObservationForImage = null;
+    let currentImage = null;
+    
+    // Inicialización
+    document.addEventListener('DOMContentLoaded', function() {
+      // Inicializar modales
+      deleteModal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
+      imageModal = new bootstrap.Modal(document.getElementById('imageModal'));
+      
+      // Event listeners
+      document.getElementById('confirm-delete-btn').addEventListener('click', deleteObservation);
+      document.getElementById('observation-form').addEventListener('submit', handleFormSubmit);
+      document.getElementById('taxon-level').addEventListener('change', updateTaxonSelect);
+      document.getElementById('save-image-btn').addEventListener('click', saveImage);
+      document.getElementById('delete-image-btn').addEventListener('click', confirmDeleteImage);
+      
+      // Cargar datos iniciales
+      Promise.all([loadUsuarios(), loadTaxones()])
+        .then(() => loadObservations())
+        .catch(error => {
+          console.error("Error inicializando:", error);
+          document.getElementById('observations-container').innerHTML = `
+            <div class="col-12 text-center py-4 text-danger">
+              <p>Error al cargar los datos iniciales</p>
+              <button class="btn btn-warning" onclick="location.reload()">Reintentar</button>
+            </div>
+          `;
+        });
+    });
+    
+    // Cargar usuarios
+    function loadUsuarios() {
+      return fetch(`${API_BASE_URL}/api/usuarios`)
+        .then(response => {
+          if (!response.ok) throw new Error('Error al cargar usuarios');
+          return response.json();
+        })
+        .then(data => {
+          usuarios = data;
+          const select = document.getElementById('usuario-id');
+          select.innerHTML = '<option value="">Seleccione un usuario</option>';
+          
+          data.forEach(usuario => {
+            const option = document.createElement('option');
+            option.value = usuario.id;
+            option.textContent = `${usuario.nombre} ${usuario.apellido1} ${usuario.apellido2 || ''}`.trim();
+            select.appendChild(option);
+          });
+          return data;
+        })
+        .catch(error => {
+          console.error('Error al cargar usuarios:', error);
+          alert('Error al cargar usuarios. Ver consola para detalles.');
+        });
+    }
+    
+    // Cargar taxones
+    function loadTaxones() {
+      return fetch(`${API_BASE_URL}/api/taxones`)
+        .then(response => {
+          if (!response.ok) throw new Error('Error al cargar taxones');
+          return response.json();
+        })
+        .then(data => {
+          taxones = data;
+          taxonesPorNivel = {
+            clase: data.filter(t => t.nivel === 'clase'),
+            orden: data.filter(t => t.nivel === 'orden'),
+            familia: data.filter(t => t.nivel === 'familia'),
+            genero: data.filter(t => t.nivel === 'genero'),
+            especie: data.filter(t => t.nivel === 'especie')
+          };
+          return data;
+        })
+        .catch(error => {
+          console.error('Error al cargar taxones:', error);
+          alert('Error al cargar taxones. Ver consola para detalles.');
+        });
+    }
+    
+    // Actualizar selector de taxones según nivel seleccionado
+    function updateTaxonSelect() {
+      const nivel = document.getElementById('taxon-level').value;
+      const taxonesDelNivel = taxonesPorNivel[nivel] || [];
+      const select = document.getElementById('taxon-select');
+      
+      document.getElementById('taxon-label').textContent = `Seleccione ${getTaxonLabel(nivel)}`;
+      
+      select.innerHTML = '<option value="">Seleccione una opción</option>';
+      
+      taxonesDelNivel.forEach(taxon => {
+        const option = document.createElement('option');
+        option.value = taxon.id;
+        option.textContent = taxon.nombreCientifico;
+        if (taxon.nombreComun) {
+          option.textContent += ` (${taxon.nombreComun})`;
+        }
+        select.appendChild(option);
+      });
+    }
+    
+    // Obtener etiqueta para nivel taxonómico
+    function getTaxonLabel(nivel) {
+      const labels = {
+        clase: 'una clase',
+        orden: 'un orden', 
+        familia: 'una familia',
+        genero: 'un género',
+        especie: 'una especie'
+      };
+      return labels[nivel] || nivel;
+    }
+    
+    // Mostrar formulario para nueva observación
+    function showAddForm() {
+      document.getElementById('form-title').textContent = 'Nueva Observación';
+      document.getElementById('observation-id').value = '';
+      document.getElementById('observation-form').reset();
+      document.getElementById('form-container').style.display = 'block';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    
+    // Ocultar formulario
+    function hideForm() {
+      document.getElementById('form-container').style.display = 'none';
+    }
+    
+    // Manejar envío del formulario
+    function handleFormSubmit(e) {
+      e.preventDefault();
+      
+      const id = document.getElementById('observation-id').value;
+      const method = id ? 'PUT' : 'POST';
+      const url = id ? `${API_BASE_URL}/api/observaciones/${id}` : `${API_BASE_URL}/api/observaciones`;
+      
+      const taxonId = document.getElementById('taxon-select').value;
+      if (!taxonId) {
+        alert('Por favor seleccione un taxón');
+        return;
+      }
+      
+      const observationData = {
+        usuario: { 
+          id: parseInt(document.getElementById('usuario-id').value) 
+        },
+        taxon: { 
+          id: parseInt(taxonId) 
+        },
+        urlImagen: document.getElementById('url-imagen').value,
+        fechaObservacion: document.getElementById('fecha-observacion').value,
+        latitud: Number(document.getElementById('latitud').value),
+        longitud: Number(document.getElementById('longitud').value),
+        notas: document.getElementById('notas').value
+      };
+      
+      // Si es una actualización, añadimos el ID
+      if (id) {
+        observationData.id = parseInt(id);
+      }
+      
+      fetch(url, {
+        method: method,
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(observationData)
+      })
+      .then(response => {
+        if (!response.ok) {
+          return response.text().then(text => { throw new Error(text || 'Error al guardar') });
+        }
+        return response.json();
+      })
+      .then(() => {
+        hideForm();
+        loadObservations();
+        alert('Observación guardada con éxito');
+      })
+      .catch(error => {
+        console.error('Error detallado:', error);
+        alert('Error al guardar: ' + error.message);
+      });
+    }
+    
+    // Cargar observaciones
+    function loadObservations() {
+      document.getElementById('observations-container').innerHTML = `
+        <div class="col-12 text-center py-5">
+          <div class="spinner-border text-success" role="status">
+            <span class="visually-hidden">Cargando...</span>
+          </div>
+        </div>
+      `;
+      
+      fetch(`${API_BASE_URL}/api/observaciones`)
+        .then(response => {
+          if (!response.ok) throw new Error('Error al cargar observaciones');
+          return response.json();
+        })
+        .then(data => {
+          const container = document.getElementById('observations-container');
+          container.innerHTML = '';
+          
+          if (data.length === 0) {
+            container.innerHTML = `
+              <div class="col-12 text-center py-4">
+                <p>No hay observaciones registradas</p>
+                <button class="btn btn-success" onclick="showAddForm()">
+                  <i class="bi bi-plus-circle"></i> Crear primera observación
+                </button>
+              </div>
+            `;
+            return;
+          }
+          
+          // Cargar imágenes para cada observación
+          const promises = data.map(obs => {
+            return fetch(`${API_BASE_URL}/api/imagenes/por-observacion/${obs.id}`)
+              .then(response => {
+                if (!response.ok) return null;
+                return response.json();
+              })
+              .then(imageData => {
+                return { observation: obs, image: imageData };
+              })
+              .catch(() => {
+                return { observation: obs, image: null };
+              });
+          });
+          
+          Promise.all(promises)
+            .then(results => {
+              results.forEach(({observation, image}) => {
+                const card = createObservationCard(observation, image);
+                container.appendChild(card);
+              });
+            });
+        })
+        .catch(error => {
+          document.getElementById('observations-container').innerHTML = `
+            <div class="col-12 text-center py-4 text-danger">
+              <p>Error al cargar observaciones: ${error.message}</p>
+              <button class="btn btn-warning" onclick="loadObservations()">Reintentar</button>
+            </div>
+          `;
+        });
+    }
+    
+    // Crear tarjeta de observación
+    function createObservationCard(obs, image) {
+      const usuario = usuarios.find(u => u.id === obs.usuario.id) || {
+        nombre: 'Desconocido',
+        apellido1: '',
+        apellido2: ''
+      };
+      
+      const taxon = taxones.find(t => t.id === obs.taxon.id) || {
+        nombreCientifico: 'Taxón desconocido',
+        nombreComun: ''
+      };
+      
+      const card = document.createElement('div');
+      card.className = 'col-md-6 col-lg-4 mb-4';
+      card.innerHTML = `
+        <div class="card h-100">
+          <img src="${obs.urlImagen}" class="card-img-top" 
+               alt="${taxon.nombreComun || taxon.nombreCientifico}"
+               onerror="this.src='https://via.placeholder.com/400x200?text=Imagen+no+disponible'">
+          
+          <div class="card-body">
+            <h5 class="card-title">${taxon.nombreComun || 'Especie no identificada'}</h5>
+            <h6 class="card-subtitle mb-2 text-muted"><em>${taxon.nombreCientifico}</em></h6>
+            
+            <p class="card-text">
+              <small class="text-muted">
+                <i class="bi bi-calendar"></i> ${formatDate(obs.fechaObservacion)}<br>
+                <i class="bi bi-person"></i> ${usuario.nombre} ${usuario.apellido1}<br>
+                <i class="bi bi-geo-alt"></i> ${obs.latitud}, ${obs.longitud}
+              </small>
+            </p>
+            
+            <!-- Sección de imagen -->
+            <div class="image-section mb-3">
+              ${image ? `
+                <div class="d-flex align-items-center mb-2">
+                  <img src="${image.observacion.urlImagen}" class="img-thumbnail me-2" 
+                       alt="Imagen de ${taxon.nombreComun || taxon.nombreCientifico}">
+                  <div>
+                    <small class="d-block"><strong>Licencia:</strong> ${image.licencia.nombre}</small>
+                    <small class="d-block"><strong>Propietario:</strong> ${image.propietarioImagen}</small>
+                  </div>
+                </div>
+              ` : `
+                <div class="alert alert-warning p-2 mb-2">
+                  <small>No hay metadatos de imagen registrados</small>
+                </div>
+              `}
+            </div>
+            
+            <div class="d-flex justify-content-between">
+              <button class="btn btn-sm btn-outline-primary edit-btn" data-id="${obs.id}">
+                <i class="bi bi-pencil"></i> Editar
+              </button>
+              <div>
+                <button class="btn btn-sm btn-outline-info me-2 manage-image-btn" data-id="${obs.id}">
+                  <i class="bi bi-image"></i> Imagen
+                </button>
+                <button class="btn btn-sm btn-outline-danger delete-btn" data-id="${obs.id}">
+                  <i class="bi bi-trash"></i> Eliminar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      card.querySelector('.edit-btn').addEventListener('click', () => editObservation(obs.id));
+      card.querySelector('.delete-btn').addEventListener('click', () => confirmDelete(obs.id));
+      card.querySelector('.manage-image-btn').addEventListener('click', () => manageImage(obs.id, image));
+      
+      return card;
+    }
+    
+    function formatDate(dateString) {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('es-ES', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    }
+    
+    // Editar observación
+    function editObservation(id) {
+      fetch(`${API_BASE_URL}/api/observaciones/${id}`)
+        .then(response => {
+          if (!response.ok) throw new Error('Error al cargar observación');
+          return response.json();
+        })
+        .then(obs => {
+          document.getElementById('form-title').textContent = 'Editar Observación';
+          document.getElementById('observation-id').value = obs.id;
+          document.getElementById('usuario-id').value = obs.usuario.id;
+          
+          const taxon = taxones.find(t => t.id === obs.taxon.id);
+          if (taxon) {
+            document.getElementById('taxon-level').value = taxon.nivel;
+            updateTaxonSelect();
+            
+            // Pequeño retraso para asegurar que el select se actualizó
+            setTimeout(() => {
+              document.getElementById('taxon-select').value = taxon.id;
+            }, 100);
+          }
+          
+          document.getElementById('url-imagen').value = obs.urlImagen;
+          document.getElementById('fecha-observacion').value = obs.fechaObservacion.split('T')[0];
+          document.getElementById('latitud').value = obs.latitud;
+          document.getElementById('longitud').value = obs.longitud;
+          document.getElementById('notas').value = obs.notas || '';
+          
+          document.getElementById('form-container').style.display = 'block';
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          alert('Error al cargar observación: ' + error.message);
+        });
+    }
+    
+    // Confirmar eliminación
+    function confirmDelete(id) {
+      observationToDelete = id;
+      deleteModal.show();
+    }
+    
+    // Eliminar observación
+    function deleteObservation() {
+      if (!observationToDelete) return;
+      
+      fetch(`${API_BASE_URL}/api/observaciones/${observationToDelete}`, {
+        method: 'DELETE'
+      })
+      .then(response => {
+        if (!response.ok) throw new Error('Error al eliminar');
+        deleteModal.hide();
+        loadObservations();
+        observationToDelete = null;
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        deleteModal.hide();
+        alert('Error al eliminar: ' + error.message);
+      });
+    }
+    
+    // Gestionar imagen de observación
+    function manageImage(observationId, imageData) {
+      currentObservationForImage = observationId;
+      currentImage = imageData;
+      
+      // Obtener datos de la observación para prellenar el formulario
+      fetch(`${API_BASE_URL}/api/observaciones/${observationId}`)
+        .then(response => {
+          if (!response.ok) throw new Error('Error al cargar observación');
+          return response.json();
+        })
+        .then(obs => {
+          const modalTitle = document.getElementById('imageModalTitle');
+          const imagePreview = document.getElementById('image-preview');
+          const imageUrl = document.getElementById('image-url');
+          const imageLicense = document.getElementById('image-license');
+          const imageOwner = document.getElementById('image-owner');
+          const imageDate = document.getElementById('image-date');
+          const deleteBtn = document.getElementById('delete-image-btn');
+          const metadataSection = document.getElementById('image-metadata');
+          
+          // Configurar modal según si es nueva imagen o edición
+          if (imageData) {
+            modalTitle.textContent = 'Editar Metadatos de Imagen';
+            imageUrl.value = imageData.observacion.urlImagen;
+            imageLicense.value = imageData.licencia.id;
+            imageOwner.value = imageData.propietarioImagen;
+            imageDate.value = imageData.fechaToma.split('T')[0];
+            deleteBtn.style.display = 'block';
+            
+            // Mostrar metadatos existentes
+            metadataSection.innerHTML = `
+              <p><strong>Taxón:</strong> ${obs.taxon.nombreCientifico} (${obs.taxon.nombreComun || 'sin nombre común'})</p>
+              <p><strong>Observador:</strong> ${obs.usuario.nombre} ${obs.usuario.apellido1}</p>
+              <p><strong>Fecha observación:</strong> ${formatDate(obs.fechaObservacion)}</p>
+              <p><strong>Ubicación:</strong> ${obs.latitud}, ${obs.longitud}</p>
+            `;
+          } else {
+            modalTitle.textContent = 'Agregar Metadatos de Imagen';
+            imageUrl.value = obs.urlImagen;
+            imageLicense.value = '';
+            imageOwner.value = '';
+            imageDate.value = obs.fechaObservacion.split('T')[0];
+            deleteBtn.style.display = 'none';
+            
+            // Mostrar metadatos de la observación
+            metadataSection.innerHTML = `
+              <p><strong>Taxón:</strong> ${obs.taxon.nombreCientifico} (${obs.taxon.nombreComun || 'sin nombre común'})</p>
+              <p><strong>Observador:</strong> ${obs.usuario.nombre} ${obs.usuario.apellido1}</p>
+              <p><strong>Fecha observación:</strong> ${formatDate(obs.fechaObservacion)}</p>
+              <p><strong>Ubicación:</strong> ${obs.latitud}, ${obs.longitud}</p>
+              <div class="alert alert-info mt-2">
+                <small>Complete los metadatos de la imagen asociada a esta observación</small>
+              </div>
+            `;
+          }
+          
+          // Configurar vista previa de la imagen
+          imagePreview.src = obs.urlImagen;
+          imagePreview.onerror = function() {
+            this.src = 'https://via.placeholder.com/400x200?text=Imagen+no+disponible';
+          };
+          
+          // Mostrar modal
+          imageModal.show();
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          alert('Error al cargar datos de observación: ' + error.message);
+        });
+    }
+    
+    // Guardar imagen (crear o actualizar)
+    function saveImage() {
+      const imageUrl = document.getElementById('image-url').value;
+      const licenseId = document.getElementById('image-license').value;
+      const owner = document.getElementById('image-owner').value;
+      const dateTaken = document.getElementById('image-date').value;
+      
+      if (!imageUrl || !licenseId || !owner || !dateTaken) {
+        alert('Por favor complete todos los campos requeridos');
+        return;
+      }
+      
+      // Obtener datos de la observación actual
+      fetch(`${API_BASE_URL}/api/observaciones/${currentObservationForImage}`)
+        .then(response => {
+          if (!response.ok) throw new Error('Error al cargar observación');
+          return response.json();
+        })
+        .then(obs => {
+          const imageData = {
+            observacion: { id: currentObservationForImage },
+            usuario: { id: obs.usuario.id },
+            taxon: { id: obs.taxon.id },
+            licencia: { id: parseInt(licenseId) },
+            fechaToma: dateTaken,
+            propietarioImagen: owner
+          };
+          
+          // Si estamos editando, añadimos el ID
+          if (currentImage) {
+            imageData.id = currentImage.id;
+          }
+          
+          const method = currentImage ? 'PUT' : 'POST';
+          const url = currentImage ? 
+            `${API_BASE_URL}/api/imagenes/${currentImage.id}` : 
+            `${API_BASE_URL}/api/imagenes`;
+          
+          fetch(url, {
+            method: method,
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(imageData)
+          })
+          .then(response => {
+            if (!response.ok) throw new Error('Error al guardar imagen');
+            return response.json();
+          })
+          .then(() => {
+            imageModal.hide();
+            loadObservations();
+            alert('Metadatos de imagen guardados con éxito');
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            alert('Error al guardar imagen: ' + error.message);
+          });
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          alert('Error al cargar datos de observación: ' + error.message);
+        });
+    }
+    
+    // Confirmar eliminación de imagen
+    function confirmDeleteImage() {
+      if (confirm('¿Estás seguro de que deseas eliminar los metadatos de esta imagen?')) {
+        deleteImage();
+      }
+    }
+    
+    // Eliminar imagen
+    function deleteImage() {
+      if (!currentImage) return;
+      
+      fetch(`${API_BASE_URL}/api/imagenes/${currentImage.id}`, {
+        method: 'DELETE'
+      })
+      .then(response => {
+        if (!response.ok) throw new Error('Error al eliminar imagen');
+        imageModal.hide();
+        loadObservations();
+        currentImage = null;
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('Error al eliminar imagen: ' + error.message);
+      });
+    }
+  </script>
+</body>
+</html>
